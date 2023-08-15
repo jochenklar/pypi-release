@@ -1,0 +1,63 @@
+[project]
+name = "pypi-release"
+authors = [
+    { name = "Jochen Klar", email = "mail@jochenklar.de" },
+]
+description = "A command line script to publish python packages to PyPI (using twine)."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+classifiers = [
+    'Operating System :: OS Independent',
+    'License :: OSI Approved :: MIT License',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+]
+dependencies = [
+    "build",
+    "twine"
+]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/jochenklar/pypi-release"
+
+[project.scripts]
+pypi-release = "pypi_release.__main__:main"
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "black"
+]
+
+[tool.setuptools]
+packages = ["pypi_release"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pypi_release.__version__" }
+
+[tool.black]
+line-length = 120
+
+[tool.ruff]
+line-length = 120
+select = [
+  "B",    # flake8-bugbear
+  "C4",   # flake8-comprehensions
+  "E",    # pycodestyle
+  "F",    # pyflakes
+  "I",    # isort
+  "PGH",  # pygrep-hooks
+  "RUF",  # ruff
+  "UP",   # pyupgrade
+  "W",    # pycodestyle
+  "YTT",  # flake8-2020
+]
+
+[tool.ruff.isort]
+lines-between-types = 1
+lines-after-imports = 2
+known-first-party = ["pypi_release"]
