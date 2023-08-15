@@ -4,14 +4,14 @@ pypi-release
 A command line script to publish python packages to [PyPI](https://pypi.org), with a lot of checking before.
 
 Setup
-=====
+-----
 
 ```bash
 pip install git+https://github.com/jochenklar/pypi-release
 ```
 
 Usage
-=====
+-----
 
 ```bash
 usage: pypi-release [-h] [--skip-npm] [--skip-build] [--skip-git-check] [--skip-github-check]
@@ -34,7 +34,7 @@ optional arguments:
 ```
 
 Example
-=======
+-------
 
 ```bash
 pypi-release rdmo 2.0.0
