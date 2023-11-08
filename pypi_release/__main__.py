@@ -9,8 +9,9 @@ from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("name", help="name of the package")
+    parser.add_argument("project", help="name of the project")
     parser.add_argument("version", help="version to be published")
+    parser.add_argument("--package", help="name of the package, if it differs from the project name")
     parser.add_argument("--skip-npm", action="store_true", default=False)
     parser.add_argument("--skip-build", action="store_true", default=False)
     parser.add_argument("--skip-git-check", action="store_true", default=False)
@@ -20,8 +21,9 @@ def main():
     parser.add_argument("--skip-twine-upload", action="store_true", default=False)
 
     args = parser.parse_args()
-    name = args.name
+    project = args.project
     version = args.version
+    package = args.package or project
 
     try:
         import build  # noqa: F401
@@ -42,16 +44,16 @@ def main():
     # run "python -m build"
     if not args.skip_build:
         shutil.rmtree("dist", ignore_errors=True)
-        shutil.rmtree(f"{name}.egg-info", ignore_errors=True)
+        shutil.rmtree(f"{project}.egg-info", ignore_errors=True)
         subprocess.check_call(["python3", "-m", "build"])
 
     # check that the version of the tarball is correct
-    tarball_path = Path("dist").joinpath(f"{name}-{version}.tar.gz")
+    tarball_path = Path("dist").joinpath(f"{project}-{version}.tar.gz")
     if not tarball_path.exists():
         parser.error(f"version missmatch: {tarball_path} does not exist.")
 
     # check that the version of the wheel is correct
-    wheel_path = Path("dist").joinpath(f"{name}-{version}-py3-none-any.whl")
+    wheel_path = Path("dist").joinpath(f"{package}-{version}-py3-none-any.whl")
     if not wheel_path.exists():
         parser.error(f"version missmatch: {wheel_path} does not exist.")
 
