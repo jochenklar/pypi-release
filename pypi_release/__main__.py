@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import re
 import shutil
 import subprocess
+import urllib.error
 import urllib.request
 
 from pathlib import Path
@@ -21,7 +23,8 @@ def main():
 
     args = parser.parse_args()
     name = args.name
-    package = name.replace('-', '_')
+    # normalized name used in sdist and wheel filenames (PEP 625, PEP 427)
+    package = re.sub(r"[-_.]+", "_", name).lower()
     version = args.version
 
     try:
@@ -38,12 +41,14 @@ def main():
     if not args.skip_git_check:
         git_tag = subprocess.check_output(["git", "describe", "--tags"]).decode().strip()
         if git_tag != version:
-            parser.error(f"git tag missmatch: {git_tag} != {version}.")
+            parser.error(f"git tag mismatch: {git_tag} != {version}.")
 
     # check that there is a github release for this version
     if not args.skip_github_check:
         git_remote_url = subprocess.check_output(["git", "config", "--get", "remote.origin.url"])
-        git_remote_url = git_remote_url.decode().strip().replace('.git', '')
+        git_remote_url = git_remote_url.decode().strip()
+        if git_remote_url.endswith(".git"):
+            git_remote_url = git_remote_url[:-4]
 
         if git_remote_url.startswith("https://github.com"):
             github_url = git_remote_url
@@ -56,32 +61,33 @@ def main():
 
         try:
             urllib.request.urlopen(release_url)
-        except urllib.error.HTTPError:
+        except urllib.error.URLError:
             parser.error(f"could not access GitHub release at {release_url}.")
 
     # run "npm run build:prod"
     if not args.skip_npm:
         if Path("package.json").exists():
-            shutil.rmtree("node_modules", ignore_errors=True)
             subprocess.check_call([
-                "/bin/bash", "-i", "-c", "nvm use; npm ci > /dev/null; npm run build:prod > /dev/null"
+                "/bin/bash", "-i", "-c", "nvm use && npm ci > /dev/null && npm run build:prod > /dev/null"
             ])
 
     # run "python -m build"
     if not args.skip_build:
         shutil.rmtree("dist", ignore_errors=True)
-        shutil.rmtree(f"{name}.egg-info", ignore_errors=True)
+        # setuptools keeps the case of the name for the egg-info directory
+        for egg_info in {f"{name.replace('-', '_')}.egg-info", f"{package}.egg-info"}:
+            shutil.rmtree(egg_info, ignore_errors=True)
         subprocess.check_call(["python3", "-m", "build"])
 
     # check that the version of the tarball is correct
     tarball_path = Path("dist").joinpath(f"{package}-{version}.tar.gz")
     if not tarball_path.exists():
-        parser.error(f"version missmatch: {tarball_path} does not exist.")
+        parser.error(f"version mismatch: {tarball_path} does not exist.")
 
     # check that the version of the wheel is correct
     wheel_path = Path("dist").joinpath(f"{package}-{version}-py3-none-any.whl")
     if not wheel_path.exists():
-        parser.error(f"version missmatch: {wheel_path} does not exist.")
+        parser.error(f"version mismatch: {wheel_path} does not exist.")
 
     # run "twine check dist/*"
     if not args.skip_twine_check:
@@ -90,12 +96,7 @@ def main():
     # run "twine upload -r testpypi dist/*"
     if not args.skip_twine_test_upload:
         answer = input("Upload to test.pypi.org. Do you want to continue? [y/N]")
-        if answer.lower() in [
-            "y",
-            "yes",
-            "Y",
-            "Yes",
-        ]:
+        if answer.lower() in ("y", "yes"):
             subprocess.check_call(["twine", "upload", "-r", "testpypi", "dist/*"])
         else:
             print("Skipping.")
@@ -103,12 +104,7 @@ def main():
     # run "twine upload dist/*"
     if not args.skip_twine_upload:
         answer = input("Upload to pypi.org. Do you want to continue? [y/N]")
-        if answer.lower() in [
-            "y",
-            "yes",
-            "Y",
-            "Yes",
-        ]:
+        if answer.lower() in ("y", "yes"):
             subprocess.check_call(["twine", "upload", "dist/*"])
         else:
             print("Abort.")
