@@ -21,6 +21,7 @@ def main():
 
     args = parser.parse_args()
     name = args.name
+    package = name.replace('-', '_')
     version = args.version
 
     try:
@@ -33,28 +34,6 @@ def main():
     except ImportError:
         parser.error("twine is not installed.")
 
-    # run "npm run build:prod"
-    if not args.skip_npm:
-        if Path("package.json").exists():
-            shutil.rmtree("node_modules", ignore_errors=True)
-            subprocess.call(["/bin/bash", "-i", "-c", "nvm use; npm install; npm run build:prod"])
-
-    # run "python -m build"
-    if not args.skip_build:
-        shutil.rmtree("dist", ignore_errors=True)
-        shutil.rmtree(f"{name}.egg-info", ignore_errors=True)
-        subprocess.check_call(["python3", "-m", "build"])
-
-    # check that the version of the tarball is correct
-    tarball_path = Path("dist").joinpath(f"{name}-{version}.tar.gz")
-    if not tarball_path.exists():
-        parser.error(f"version missmatch: {tarball_path} does not exist.")
-
-    # check that the version of the wheel is correct
-    wheel_path = Path("dist").joinpath(f"{name}-{version}-py3-none-any.whl")
-    if not wheel_path.exists():
-        parser.error(f"version missmatch: {wheel_path} does not exist.")
-
     # check if we are on the correct git tag
     if not args.skip_git_check:
         git_tag = subprocess.check_output(["git", "describe", "--tags"]).decode().strip()
@@ -64,7 +43,7 @@ def main():
     # check that there is a github release for this version
     if not args.skip_github_check:
         git_remote_url = subprocess.check_output(["git", "config", "--get", "remote.origin.url"])
-        git_remote_url = git_remote_url.decode().strip()
+        git_remote_url = git_remote_url.decode().strip().replace('.git', '')
 
         if git_remote_url.startswith("https://github.com"):
             github_url = git_remote_url
@@ -80,13 +59,38 @@ def main():
         except urllib.error.HTTPError:
             parser.error(f"could not access GitHub release at {release_url}.")
 
+    # run "npm run build:prod"
+    if not args.skip_npm:
+        if Path("package.json").exists():
+            shutil.rmtree("node_modules", ignore_errors=True)
+            subprocess.check_call([
+                "/bin/bash", "-i", "-c", "nvm use; npm ci > /dev/null; npm run build:prod > /dev/null"
+            ])
+
+    # run "python -m build"
+    if not args.skip_build:
+        shutil.rmtree("dist", ignore_errors=True)
+        shutil.rmtree(f"{name}.egg-info", ignore_errors=True)
+        subprocess.check_call(["python3", "-m", "build"])
+
+    # check that the version of the tarball is correct
+    tarball_path = Path("dist").joinpath(f"{package}-{version}.tar.gz")
+    if not tarball_path.exists():
+        parser.error(f"version missmatch: {tarball_path} does not exist.")
+
+    # check that the version of the wheel is correct
+    wheel_path = Path("dist").joinpath(f"{package}-{version}-py3-none-any.whl")
+    if not wheel_path.exists():
+        parser.error(f"version missmatch: {wheel_path} does not exist.")
+
     # run "twine check dist/*"
     if not args.skip_twine_check:
         subprocess.check_call(["twine", "check", "dist/*"])
 
     # run "twine upload -r testpypi dist/*"
     if not args.skip_twine_test_upload:
-        if input("Upload to test.pypi.org. Do you want to continue? [y/N]").lower() in [
+        answer = input("Upload to test.pypi.org. Do you want to continue? [y/N]")
+        if answer.lower() in [
             "y",
             "yes",
             "Y",
@@ -98,7 +102,8 @@ def main():
 
     # run "twine upload dist/*"
     if not args.skip_twine_upload:
-        if input("Upload to pypi.org. Do you want to continue? [y/N]").lower() in [
+        answer = input("Upload to pypi.org. Do you want to continue? [y/N]")
+        if answer.lower() in [
             "y",
             "yes",
             "Y",
